@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Portfolio Analytics Pro & Combined PnL</title>
+    <!-- Chart.js & Zoom Plugin CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammerjs/2.0.8/hammer.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --text-main: #0f172a;
+            --text-sub: #64748b;
+            --border-color: #e2e8f0;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        p.subtitle {
+            font-size: 14px;
+            color: var(--text-sub);
+            margin-top: 4px;
+        }
+
+        .upload-area {
+            background: var(--card-bg);
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 24px;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: #eff6ff;
+        }
+
+        .upload-area input {
+            display: none;
+        }
+
+        .btn-upload {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            margin-top: 12px;
+            cursor: pointer;
+        }
+
+        .controls-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+            background: var(--card-bg);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tabs, .time-agg, .combined-menu {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn, .agg-btn, .comb-btn {
+            background: #f1f5f9;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-sub);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active, .agg-btn.active, .comb-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-title {
+            font-size: 12px;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 6px;
+            color: var(--text-main);
+        }
+
+        .stat-desc {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
+
+        .chart-card, .table-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .chart-header, .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .chart-title, .table-title {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .chart-tools {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn-reset-zoom {
+            background: #e2e8f0;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-reset-zoom:hover {
+            background: #cbd5e1;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 480px;
+            width: 100%;
+        }
+
+        /* Table Styling */
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: var(--text-sub);
+            padding: 12px;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:hover {
+            background-color: #f1f5f9;
+        }
+
+        .badge-buy {
+            background: #dcfce7;
+            color: #15803d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .badge-sell {
+            background: #fee2e2;
+            color: #b91c1c;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            font-size: 13px;
+            color: var(--text-sub);
+        }
+
+        .page-btn {
+            background: #e2e8f0;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .search-input {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-size: 13px;
+            width: 200px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 16px;
+            color: var(--text-sub);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Crypto Portfolio Analytics Pro & Combined PnL</h1>
+        <p class="subtitle">Analisis Portofolio Kripto, Grafik Gabungan PnL, Rata-Rata Beli, & Histori Transaksi</p>
+    </header>
+
+    <!-- Upload Section -->
+    <div class="upload-area" id="dropArea" onclick="document.getElementById('csvInput').click()">
+        <p style="font-size: 16px; font-weight: 600; color: var(--text-main);">Unggah File CSV Portofolio Anda</p>
+        <p style="font-size: 13px; color: var(--text-sub); margin-top: 4px;">Drag & drop file CSV di sini atau klik untuk memilih file</p>
+        <span class="btn-upload">Pilih File CSV</span>
+        <input type="file" id="csvInput" accept=".csv" onchange="handleFileSelect(event)">
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="controls-bar" id="controlsBar" style="display: none;">
+        <!-- Asset Tabs -->
+        <div class="tabs" id="assetTabs">
+            <button class="tab-btn active" onclick="switchAsset('BTC')">BTC</button>
+            <button class="tab-btn" onclick="switchAsset('ETH')">ETH</button>
+            <button class="tab-btn" onclick="switchAsset('DOGE')">DOGE</button>
+            <button class="tab-btn" onclick="switchAsset('COMBINED')">📊 Grafik Gabungan</button>
+            <button class="tab-btn" onclick="switchAsset('ALL')">Ringkasan PnL</button>
+        </div>
+
+        <!-- Time Aggregation Toggle (for Single Asset) -->
+        <div class="time-agg" id="timeAggToggle">
+            <button class="agg-btn active" onclick="switchAgg('daily')">📅 Harian</button>
+            <button class="agg-btn" onclick="switchAgg('weekly')">📆 Mingguan (7 Hari)</button>
+            <button class="agg-btn" onclick="switchAgg('monthly')">🗓️ Bulanan</button>
+        </div>
+
+        <!-- Combined Sub-Menu (for Combined Tab) -->
+        <div class="combined-menu" id="combinedMenuToggle" style="display: none;">
+            <button class="comb-btn active" onclick="switchCombinedMode('modal')">📈 Akumulasi Modal</button>
+            <button class="comb-btn" onclick="switchCombinedMode('pnl')">⚖️ Perbandingan PnL (%)</button>
+            <button class="comb-btn" onclick="switchCombinedMode('avgprice')">🎯 Perbandingan Rata-Rata Beli</button>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid" id="statsGrid" style="display: none;">
+        <div class="stat-card">
+            <div class="stat-title">Total Transaksi (CSV)</div>
+            <div class="stat-value" id="statTotalTxCount">0</div>
+            <div class="stat-desc">Jumlah Baris Transaksi</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Total Akumulasi Unit</div>
+            <div class="stat-value" id="statUnits">0</div>
+            <div class="stat-desc" id="statAssetSymbol">-</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Total Modal Beli</div>
+            <div class="stat-value" id="statInvested">Rp 0</div>
+            <div class="stat-desc">Total Dana Ditanam</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Rata-Rata Beli (DCA)</div>
+            <div class="stat-value" id="statAvgPrice">Rp 0</div>
+            <div class="stat-desc" style="color: #ef4444;">Garis Merah Dinamis</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Estimasi PnL (Unrealized)</div>
+            <div class="stat-value" id="statPnL">Rp 0</div>
+            <div class="stat-desc" id="statPnLPercent">0%</div>
+        </div>
+    </div>
+
+    <!-- Main Chart Card -->
+    <div class="chart-card" id="chartCard" style="display: none;">
+        <div class="chart-header">
+            <div>
+                <div class="chart-title" id="chartTitle">Pertumbuhan & Titik Harga Pembelian</div>
+                <span style="font-size: 12px; color: var(--text-sub);" id="chartSubtitle">Scroll Mouse untuk Zoom | Drag untuk Geser</span>
+            </div>
+            <div class="chart-tools">
+                <button class="btn-reset-zoom" onclick="resetZoomChart()">🔄 Reset Zoom</button>
+            </div>
+        </div>
+        <div class="chart-container">
+            <canvas id="mainChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Transaction History Table Card -->
+    <div class="table-card" id="tableCard" style="display: none;">
+        <div class="table-header">
+            <div>
+                <div class="table-title">📄 Histori Pembelian & Transaksi</div>
+                <span style="font-size: 12px; color: var(--text-sub);">Daftar riwayat lengkap transaksi dari CSV</span>
+            </div>
+            <input type="text" id="searchInput" class="search-input" placeholder="Cari aset/bursa..." oninput="filterTable()">
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Waktu / Tanggal</th>
+                        <th>Bursa</th>
+                        <th>Aset</th>
+                        <th>Jenis</th>
+                        <th>Jumlah Unit</th>
+                        <th>Harga Satuan (IDR)</th>
+                        <th>Total Nilai (IDR)</th>
+                    </tr>
+                </thead>
+                <tbody id="txTableBody">
+                </tbody>
+            </table>
+        </div>
+        <div class="pagination">
+            <span id="pageInfo">Menampilkan 0-0 dari 0 transaksi</span>
+            <div>
+                <button class="page-btn" id="prevPageBtn" onclick="changePage(-1)">Sebelumnya</button>
+                <button class="page-btn" id="nextPageBtn" onclick="changePage(1)">Selanjutnya</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="empty-state" id="emptyState">
+        <h3>Belum ada data portofolio yang diisi</h3>
+        <p style="margin-top: 8px;">Silakan unggah file CSV transaksi portofolio Anda untuk memuat analisis dan riwayat transaksi.</p>
+    </div>
+</div>
+
+<script>
+    let rawTransactions = [];
+    let currentAsset = 'BTC';
+    let currentAgg = 'daily'; 
+    let combinedMode = 'modal'; // 'modal', 'pnl', 'avgprice'
+    let livePrices = { BTC: 0, ETH: 0, DOGE: 0 };
+    let chartInstance = null;
+    let currentPage = 1;
+    const rowsPerPage = 10;
+    let filteredTxs = [];
+
+    async function fetchLivePrices() {
+        try {
+            const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,dogecoin&vs_currencies=idr');
+            const data = await res.json();
+            if (data.bitcoin) livePrices.BTC = data.bitcoin.idr;
+            if (data.ethereum) livePrices.ETH = data.ethereum.idr;
+            if (data.dogecoin) livePrices.DOGE = data.dogecoin.idr;
+            updateDashboard();
+        } catch (e) {
+            console.warn("Gagal mengambil harga live.", e);
+        }
+    }
+
+    fetchLivePrices();
+
+    const dropArea = document.getElementById('dropArea');
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    dropArea.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) processFile(files[0]);
+    });
+
+    function handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (file) processFile(file);
+    }
+
+    function processFile(file) {
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                parseCSVData(results.data);
+            }
+        });
+    }
+
+    function parseCSVData(data) {
+        rawTransactions = [];
+        data.forEach(row => {
+            const time = row['Waktu'] || row['waktu'] || row['Date'] || row['date'];
+            const bursa = row['Bursa'] || row['bursa'] || row['Exchange'] || '-';
+            const asset = (row['Aset'] || row['aset'] || row['Asset'] || '').toUpperCase();
+            const type = (row['Jenis'] || row['jenis'] || row['Type'] || 'buy').toLowerCase();
+            const amount = parseFloat(row['Jumlah'] || row['jumlah'] || row['Amount'] || 0);
+            const price = parseFloat(row['Harga'] || row['harga'] || row['Price'] || 0);
+
+            if (time && asset && amount > 0) {
+                rawTransactions.push({
+                    date: new Date(time),
+                    bursa: bursa,
+                    asset: asset,
+                    type: type,
+                    amount: amount,
+                    price: price,
+                    total: amount * price
+                });
+            }
+        });
+
+        rawTransactions.sort((a, b) => b.date - a.date);
+
+        if (rawTransactions.length > 0) {
+            document.getElementById('controlsBar').style.display = 'flex';
+            document.getElementById('statsGrid').style.display = 'grid';
+            document.getElementById('chartCard').style.display = 'block';
+            document.getElementById('tableCard').style.display = 'block';
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('statTotalTxCount').innerText = rawTransactions.length;
+
+            filteredTxs = [...rawTransactions];
+            renderTable();
+            updateDashboard();
+        }
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('txTableBody');
+        tbody.innerHTML = '';
+
+        const total = filteredTxs.length;
+        const start = (currentPage - 1) * rowsPerPage;
+        const end = Math.min(start + rowsPerPage, total);
+        const pageItems = filteredTxs.slice(start, end);
+
+        pageItems.forEach(t => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${t.date.toLocaleString('id-ID')}</td>
+                <td>${t.bursa}</td>
+                <td><strong>${t.asset}</strong></td>
+                <td><span class="${t.type === 'buy' ? 'badge-buy' : 'badge-sell'}">${t.type.toUpperCase()}</span></td>
+                <td>${t.amount.toLocaleString('id-ID', { maximumFractionDigits: 6 })}</td>
+                <td>Rp ${Math.round(t.price).toLocaleString('id-ID')}</td>
+                <td>Rp ${Math.round(t.total).toLocaleString('id-ID')}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('pageInfo').innerText = `Menampilkan ${total > 0 ? start + 1 : 0}-${end} dari ${total} transaksi`;
+        document.getElementById('prevPageBtn').disabled = currentPage === 1;
+        document.getElementById('nextPageBtn').disabled = end >= total;
+    }
+
+    function filterTable() {
+        const q = document.getElementById('searchInput').value.toLowerCase();
+        filteredTxs = rawTransactions.filter(t => 
+            t.asset.toLowerCase().includes(q) || 
+            t.bursa.toLowerCase().includes(q) ||
+            t.type.toLowerCase().includes(q)
+        );
+        currentPage = 1;
+        renderTable();
+    }
+
+    function changePage(dir) {
+        currentPage += dir;
+        renderTable();
+    }
+
+    function switchAsset(asset) {
+        currentAsset = asset;
+        document.querySelectorAll('#assetTabs .tab-btn').forEach(btn => {
+            btn.classList.toggle('active', 
+                btn.innerText.includes(asset) || 
+                (asset === 'COMBINED' && btn.innerText.includes('Gabungan')) ||
+                (asset === 'ALL' && btn.innerText.includes('Ringkasan'))
+            );
+        });
+        
+        document.getElementById('timeAggToggle').style.display = (asset === 'ALL' || asset === 'COMBINED' ? 'none' : 'flex');
+        document.getElementById('combinedMenuToggle').style.display = (asset === 'COMBINED' ? 'flex' : 'none');
+        updateDashboard();
+    }
+
+    function switchCombinedMode(mode) {
+        combinedMode = mode;
+        document.querySelectorAll('.combined-menu .comb-btn').forEach(btn => {
+            btn.classList.toggle('active', 
+                (mode === 'modal' && btn.innerText.includes('Modal')) ||
+                (mode === 'pnl' && btn.innerText.includes('PnL')) ||
+                (mode === 'avgprice' && btn.innerText.includes('Rata-Rata'))
+            );
+        });
+        updateDashboard();
+    }
+
+    function switchAgg(agg) {
+        currentAgg = agg;
+        document.querySelectorAll('.time-agg .agg-btn').forEach(btn => {
+            btn.classList.toggle('active', 
+                (agg === 'daily' && btn.innerText.includes('Harian')) ||
+                (agg === 'weekly' && btn.innerText.includes('Mingguan')) ||
+                (agg === 'monthly' && btn.innerText.includes('Bulanan'))
+            );
+        });
+        updateDashboard();
+    }
+
+    function resetZoomChart() {
+        if (chartInstance) {
+            chartInstance.resetZoom();
+        }
+    }
+
+    function updateDashboard() {
+        if (rawTransactions.length === 0) return;
+
+        if (currentAsset === 'ALL') {
+            renderSummaryDashboard();
+        } else if (currentAsset === 'COMBINED') {
+            renderCombinedAssetsDashboard();
+        } else {
+            renderSingleAssetDashboard(currentAsset);
+        }
+    }
+
+    function getWeekKey(d) {
+        const date = new Date(d);
+        const firstJan = new Date(date.getFullYear(), 0, 1);
+        const dayNum = Math.floor((date - firstJan) / 86400000);
+        const weekNum = Math.ceil((dayNum + firstJan.getDay() + 1) / 7);
+        return `${date.getFullYear()}-W${weekNum < 10 ? '0' + weekNum : weekNum}`;
+    }
+
+    function renderSingleAssetDashboard(asset) {
+        const txs = rawTransactions.filter(t => t.asset === asset).sort((a,b) => a.date - b.date);
+        
+        let totalUnits = 0;
+        let totalInvested = 0;
+
+        txs.forEach(t => {
+            if (t.type === 'buy') {
+                totalUnits += t.amount;
+                totalInvested += t.total;
+            } else {
+                totalUnits -= t.amount;
+                totalInvested -= t.total;
+            }
+        });
+
+        const finalAvgPrice = totalUnits > 0 ? totalInvested / totalUnits : 0;
+        const livePrice = livePrices[asset] || (txs.length > 0 ? txs[txs.length - 1].price : 0);
+        const currentValue = totalUnits * livePrice;
+        const pnl = currentValue - totalInvested;
+        const pnlPercent = totalInvested > 0 ? (pnl / totalInvested) * 100 : 0;
+
+        document.getElementById('statUnits').innerText = totalUnits.toLocaleString('id-ID', { maximumFractionDigits: 6 });
+        document.getElementById('statAssetSymbol').innerText = `Total Unit ${asset}`;
+        document.getElementById('statInvested').innerText = 'Rp ' + Math.round(totalInvested).toLocaleString('id-ID');
+        document.getElementById('statAvgPrice').innerText = 'Rp ' + Math.round(finalAvgPrice).toLocaleString('id-ID');
+
+        const pnlEl = document.getElementById('statPnL');
+        const pnlPctEl = document.getElementById('statPnLPercent');
+        pnlEl.innerText = 'Rp ' + Math.round(pnl).toLocaleString('id-ID');
+        pnlPctEl.innerText = (pnl >= 0 ? '+' : '') + pnlPercent.toFixed(2) + '%';
+
+        pnlEl.className = 'stat-value ' + (pnl >= 0 ? 'text-success' : 'text-danger');
+        pnlPctEl.className = 'stat-desc ' + (pnl >= 0 ? 'text-success' : 'text-danger');
+
+        let dataPoints = [];
+        const maxTotal = Math.max(...txs.map(x => x.total), 1);
+
+        if (currentAgg === 'daily') {
+            let cumUnits = 0;
+            let cumCost = 0;
+
+            txs.forEach(t => {
+                if (t.type === 'buy') {
+                    cumUnits += t.amount;
+                    cumCost += t.total;
+                } else {
+                    cumUnits -= t.amount;
+                    cumCost -= t.total;
+                }
+                const runningDCA = cumUnits > 0 ? cumCost / cumUnits : 0;
+                const pointSize = Math.max(3, Math.min(10, 3 + (t.total / maxTotal) * 7));
+
+                dataPoints.push({
+                    label: t.date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: '2-digit' }),
+                    price: t.price,
+                    runningDCA: runningDCA,
+                    cumUnits: cumUnits,
+                    pointSize: pointSize
+                });
+            });
+        } else if (currentAgg === 'weekly') {
+            let map = {};
+            txs.forEach(t => {
+                const key = getWeekKey(t.date);
+                if (!map[key]) map[key] = { totalAmount: 0, totalCost: 0 };
+                map[key].totalAmount += t.amount;
+                map[key].totalCost += t.total;
+            });
+
+            let cumUnits = 0;
+            let cumCost = 0;
+            const keys = Object.keys(map);
+            const maxCost = Math.max(...keys.map(k => map[k].totalCost), 1);
+
+            keys.forEach(key => {
+                const avgWPrice = map[key].totalCost / map[key].totalAmount;
+                cumUnits += map[key].totalAmount;
+                cumCost += map[key].totalCost;
+                const runningDCA = cumUnits > 0 ? cumCost / cumUnits : 0;
+                const pointSize = Math.max(3, Math.min(10, 3 + (map[key].totalCost / maxCost) * 7));
+
+                dataPoints.push({
+                    label: key,
+                    price: avgWPrice,
+                    runningDCA: runningDCA,
+                    cumUnits: cumUnits,
+                    pointSize: pointSize
+                });
+            });
+        } else if (currentAgg === 'monthly') {
+            let map = {};
+            txs.forEach(t => {
+                const key = t.date.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
+                if (!map[key]) map[key] = { totalAmount: 0, totalCost: 0 };
+                map[key].totalAmount += t.amount;
+                map[key].totalCost += t.total;
+            });
+
+            let cumUnits = 0;
+            let cumCost = 0;
+            const keys = Object.keys(map);
+            const maxCost = Math.max(...keys.map(k => map[k].totalCost), 1);
+
+            keys.forEach(key => {
+                const avgMPrice = map[key].totalCost / map[key].totalAmount;
+                cumUnits += map[key].totalAmount;
+                cumCost += map[key].totalCost;
+                const runningDCA = cumUnits > 0 ? cumCost / cumUnits : 0;
+                const pointSize = Math.max(3, Math.min(10, 3 + (map[key].totalCost / maxCost) * 7));
+
+                dataPoints.push({
+                    label: key,
+                    price: avgMPrice,
+                    runningDCA: runningDCA,
+                    cumUnits: cumUnits,
+                    pointSize: pointSize
+                });
+            });
+        }
+
+        renderDualAxisChart(asset, dataPoints);
+    }
+
+    function renderDualAxisChart(asset, dataPoints) {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        document.getElementById('chartTitle').innerText = `Pertumbuhan & Titik Harga Pembelian - ${asset}`;
+        document.getElementById('chartSubtitle').innerText = "Scroll mouse untuk Zoom Grafik | Drag untuk Geser (Pan)";
+
+        const labels = dataPoints.map(d => d.label);
+        const prices = dataPoints.map(d => d.price);
+        const runningDCAs = dataPoints.map(d => d.runningDCA);
+        const cumUnits = dataPoints.map(d => d.cumUnits);
+        const pointSizes = dataPoints.map(d => d.pointSize);
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: `Harga Beli ${asset} (IDR)`,
+                        data: prices,
+                        borderColor: '#2563eb',
+                        backgroundColor: '#2563eb',
+                        borderWidth: 2,
+                        pointRadius: pointSizes,
+                        pointHoverRadius: 8,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: `Rata-Rata Beli Dinamis (DCA)`,
+                        data: runningDCAs,
+                        borderColor: '#ef4444',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0, 
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: `Akumulasi Jumlah ${asset}`,
+                        data: cumUnits,
+                        borderColor: '#f97316',
+                        borderWidth: 2,
+                        borderDash: [4, 4],
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        title: { display: true, text: 'Tanggal Pembelian' }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: `Harga & Rata-Rata ${asset} (IDR)`, color: '#2563eb' },
+                        ticks: { color: '#2563eb' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: { display: true, text: `Akumulasi Jumlah ${asset}`, color: '#f97316' },
+                        ticks: { color: '#f97316' },
+                        grid: { drawOnChartArea: false }
+                    }
+                },
+                plugins: {
+                    zoom: {
+                        zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+                        pan: { enabled: true, mode: 'x' }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderCombinedAssetsDashboard() {
+        let totalInvestedAll = 0;
+        let totalValAll = 0;
+        let assetStats = {};
+
+        ['BTC', 'ETH', 'DOGE'].forEach(asset => {
+            const txs = rawTransactions.filter(t => t.asset === asset);
+            let u = 0, inv = 0;
+            txs.forEach(t => { if(t.type === 'buy'){ u += t.amount; inv += t.total; }});
+            const curVal = u * (livePrices[asset] || 0);
+            const pnl = curVal - inv;
+            const pnlPct = inv > 0 ? (pnl / inv) * 100 : 0;
+            const avgP = u > 0 ? inv / u : 0;
+            
+            assetStats[asset] = { inv, curVal, pnl, pnlPct, avgP, u };
+            totalInvestedAll += inv;
+            totalValAll += curVal;
+        });
+
+        document.getElementById('statUnits').innerText = '-';
+        document.getElementById('statAssetSymbol').innerText = 'Grafik Gabungan Aset';
+        document.getElementById('statInvested').innerText = 'Rp ' + Math.round(totalInvestedAll).toLocaleString('id-ID');
+        document.getElementById('statAvgPrice').innerText = '-';
+
+        const totalPnl = totalValAll - totalInvestedAll;
+        const totalPnlPct = totalInvestedAll > 0 ? (totalPnl / totalInvestedAll) * 100 : 0;
+        const pnlEl = document.getElementById('statPnL');
+        const pnlPctEl = document.getElementById('statPnLPercent');
+        pnlEl.innerText = 'Rp ' + Math.round(totalPnl).toLocaleString('id-ID');
+        pnlPctEl.innerText = (totalPnl >= 0 ? '+' : '') + totalPnlPct.toFixed(2) + '%';
+        pnlEl.className = 'stat-value ' + (totalPnl >= 0 ? 'text-success' : 'text-danger');
+        pnlPctEl.className = 'stat-desc ' + (totalPnl >= 0 ? 'text-success' : 'text-danger');
+
+        const sortedAsc = [...rawTransactions].sort((a,b) => a.date - b.date);
+        const labels = sortedAsc.map(t => t.date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }));
+
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        let datasets = [];
+
+        if (combinedMode === 'modal') {
+            document.getElementById('chartTitle').innerText = `Grafik Gabungan Akumulasi Modal (BTC vs ETH vs DOGE)`;
+            document.getElementById('chartSubtitle').innerText = `Perbandingan Total Modal yang Ditanam Per Aset`;
+
+            const getAssetSeries = (asset) => {
+                let cum = 0;
+                let series = [];
+                sortedAsc.forEach(t => {
+                    if (t.asset === asset) cum += t.total;
+                    series.push(cum);
+                });
+                return series;
+            };
+
+            datasets = [
+                { label: 'Akumulasi Modal BTC (IDR)', data: getAssetSeries('BTC'), borderColor: '#f59e0b', backgroundColor: '#f59e0b', borderWidth: 2, pointRadius: 2 },
+                { label: 'Akumulasi Modal ETH (IDR)', data: getAssetSeries('ETH'), borderColor: '#6366f1', backgroundColor: '#6366f1', borderWidth: 2, pointRadius: 2 },
+                { label: 'Akumulasi Modal DOGE (IDR)', data: getAssetSeries('DOGE'), borderColor: '#10b981', backgroundColor: '#10b981', borderWidth: 2, pointRadius: 2 }
+            ];
+        } else if (combinedMode === 'pnl') {
+            document.getElementById('chartTitle').innerText = `Grafik Perbandingan PnL / Untung Rugi (%) Per Aset`;
+            document.getElementById('chartSubtitle').innerText = `Persentase Profit / Loss (Unrealized PnL) Perbandingan Antar Aset`;
+
+            // Calculate running PnL percentage over time for each asset
+            const getPnlSeries = (asset) => {
+                let cumU = 0, cumInv = 0;
+                let series = [];
+                const liveP = livePrices[asset] || 1;
+                sortedAsc.forEach(t => {
+                    if (t.asset === asset) {
+                        if (t.type === 'buy') { cumU += t.amount; cumInv += t.total; }
+                        else { cumU -= t.amount; cumInv -= t.total; }
+                    }
+                    const curVal = cumU * liveP;
+                    const pnlPct = cumInv > 0 ? ((curVal - cumInv) / cumInv) * 100 : 0;
+                    series.push(pnlPct);
+                });
+                return series;
+            };
+
+            datasets = [
+                { label: 'PnL % BTC', data: getPnlSeries('BTC'), borderColor: '#f59e0b', borderWidth: 2, pointRadius: 1 },
+                { label: 'PnL % ETH', data: getPnlSeries('ETH'), borderColor: '#6366f1', borderWidth: 2, pointRadius: 1 },
+                { label: 'PnL % DOGE', data: getPnlSeries('DOGE'), borderColor: '#10b981', borderWidth: 2, pointRadius: 1 }
+            ];
+        } else if (combinedMode === 'avgprice') {
+            document.getElementById('chartTitle').innerText = `Grafik Perbandingan Rata-Rata Beli (Running DCA) Per Aset`;
+            document.getElementById('chartSubtitle').innerText = `Perbandingan Harga Rata-Rata Masuk Antar Aset`;
+
+            const getAvgPriceSeries = (asset) => {
+                let cumU = 0, cumInv = 0;
+                let series = [];
+                sortedAsc.forEach(t => {
+                    if (t.asset === asset) {
+                        if (t.type === 'buy') { cumU += t.amount; cumInv += t.total; }
+                        else { cumU -= t.amount; cumInv -= t.total; }
+                    }
+                    const avgP = cumU > 0 ? cumInv / cumU : 0;
+                    series.push(avgP > 0 ? avgP : null);
+                });
+                return series;
+            };
+
+            datasets = [
+                { label: 'Rata-Rata Beli BTC (IDR)', data: getAvgPriceSeries('BTC'), borderColor: '#f59e0b', borderWidth: 2, spanGaps: true, pointRadius: 0 },
+                { label: 'Rata-Rata Beli ETH (IDR)', data: getAvgPriceSeries('ETH'), borderColor: '#6366f1', borderWidth: 2, spanGaps: true, pointRadius: 0 },
+                { label: 'Rata-Rata Beli DOGE (IDR)', data: getAvgPriceSeries('DOGE'), borderColor: '#10b981', borderWidth: 2, spanGaps: true, pointRadius: 0 }
+            ];
+        }
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    zoom: {
+                        zoom: { wheel: { enabled: true }, mode: 'x' },
+                        pan: { enabled: true, mode: 'x' }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderSummaryDashboard() {
+        document.getElementById('chartTitle').innerText = `Ringkasan Total Portofolio`;
+        document.getElementById('chartSubtitle').innerText = `Seluruh Aset (BTC, ETH, DOGE)`;
+        
+        let totalInvested = 0;
+        let totalCurrentValue = 0;
+
+        ['BTC', 'ETH', 'DOGE'].forEach(asset => {
+            const txs = rawTransactions.filter(t => t.asset === asset);
+            let units = 0, inv = 0;
+            txs.forEach(t => {
+                if (t.type === 'buy') { units += t.amount; inv += t.total; }
+                else { units -= t.amount; inv -= t.total; }
+            });
+            totalInvested += inv;
+            totalCurrentValue += units * (livePrices[asset] || 0);
+        });
+
+        const pnl = totalCurrentValue - totalInvested;
+        const pnlPercent = totalInvested > 0 ? (pnl / totalInvested) * 100 : 0;
+
+        document.getElementById('statUnits').innerText = '-';
+        document.getElementById('statAssetSymbol').innerText = 'Gabungan Semua Aset';
+        document.getElementById('statInvested').innerText = 'Rp ' + Math.round(totalInvested).toLocaleString('id-ID');
+        document.getElementById('statAvgPrice').innerText = '-';
+
+        const pnlEl = document.getElementById('statPnL');
+        const pnlPctEl = document.getElementById('statPnLPercent');
+        pnlEl.innerText = 'Rp ' + Math.round(pnl).toLocaleString('id-ID');
+        pnlPctEl.innerText = (pnl >= 0 ? '+' : '') + pnlPercent.toFixed(2) + '%';
+
+        let cumTotal = 0;
+        let points = [];
+        const sortedAsc = [...rawTransactions].sort((a,b) => a.date - b.date);
+
+        sortedAsc.forEach(t => {
+            cumTotal += (t.type === 'buy' ? t.total : -t.total);
+            points.push({
+                label: t.date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
+                value: cumTotal
+            });
+        });
+
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: points.map(p => p.label),
+                datasets: [{
+                    label: 'Total Modal Akumulasi (IDR)',
+                    data: points.map(p => p.value),
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    fill: true,
+                    tension: 0.2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    zoom: {
+                        zoom: { wheel: { enabled: true }, mode: 'x' },
+                        pan: { enabled: true, mode: 'x' }
+                    }
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>
